@@ -1,0 +1,39 @@
+name: COBOL Build (artifact) - Compilação
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+env:
+  COBOL_PROGRAM: coin.cob
+  COBOL_EXECUTABLE: coin
+  ARTIFACT_NAME: coin-bin
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Instalar GNU COBOL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnucobol
+          cobc --version
+
+      - name: Compilar programa COBOL
+        run: |
+          cobc -x -free -o "${{ env.COBOL_EXECUTABLE }}" "${{ env.COBOL_PROGRAM }}"
+          echo "✓ Compilação bem-sucedida"
+
+      - name: Publicar binário como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.COBOL_EXECUTABLE }}
+          if-no-files-found: error
