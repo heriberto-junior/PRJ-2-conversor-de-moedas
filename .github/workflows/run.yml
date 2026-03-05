@@ -12,35 +12,53 @@ on:
         description: "Converter para"
         required: true
         type: choice
-        options:
-          - USD
-          - EUR
-          - JPY
-          - GBP
-          - AUD
-          - CAD
+        options: [USD, EUR, JPY, GBP, AUD, CAD]
+
+# Permissões para ler artifacts de OUTRA execução
+permissions:
+  contents: read
+  actions: read
 
 env:
   COBOL_EXECUTABLE: coin
   ARTIFACT_NAME: coin-bin
+  BUILD_WORKFLOW_FILE: build.yml  # <-- nome do SEU workflow de build
 
 jobs:
   run:
     runs-on: ubuntu-latest
 
-    outputs:
-      resultado_pretty: ${{ steps.parse.outputs.resultado_pretty }}
-      valor_num: ${{ steps.parse.outputs.valor_num }}
-      moeda_out: ${{ steps.parse.outputs.moeda_out }}
-
     steps:
       - name: Checkout do repositório (cotacao.txt vem daqui)
         uses: actions/checkout@v4
 
-      - name: Baixar binário compilado
+      - name: Descobrir run-id mais recente e bem-sucedido do build
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 1) Achar o workflow ID do arquivo build.yml
+          wid=$(gh api repos/${{ github.repository }}/actions/workflows | \
+                jq -r ".workflows[] | select(.path | endswith(\"/${{ env.BUILD_WORKFLOW_FILE }}\")) | .id" | head -n1)
+          if [ -z "$wid" ]; then
+            echo "Não encontrei o workflow ${{ env.BUILD_WORKFLOW_FILE }}"; exit 1
+          fi
+
+          # 2) Pegar a última execução bem-sucedida
+          rid=$(gh api repos/${{ github.repository }}/actions/workflows/$wid/runs \
+                -F status=success -F per_page=1 | jq -r '.workflow_runs[0].id')
+          if [ -z "$rid" ] || [ "$rid" = "null" ]; then
+            echo "Nenhuma execução bem-sucedida encontrada para o build"; exit 1
+          fi
+
+          echo "run_id=$rid" >> "$GITHUB_OUTPUT"
+
+      - name: Baixar binário compilado (do build mais recente)
         uses: actions/download-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          name: ${{ env.ARTIFACT_NAME }}     # coin-bin
+          run-id: ${{ steps.find.outputs.run_id }}
+          github-token: ${{ github.token }}  # token para acessar outra run
 
       - name: Garantir permissão de execução
         run: chmod +x "${{ env.COBOL_EXECUTABLE }}"
@@ -52,11 +70,8 @@ jobs:
           MOEDA: ${{ inputs.moeda_destino }}
         run: |
           set -e
-          # Agora o executável lê o cotacao.txt que já está no repo
           ./${{ env.COBOL_EXECUTABLE }} "$VALOR" "$MOEDA" | tee output.txt
-
           if grep -q "^ERRO:" output.txt; then
-            echo "Falha de validação/conversão:"
             cat output.txt
             exit 1
           fi
@@ -65,14 +80,9 @@ jobs:
         id: parse
         run: |
           line=$(grep "^RESULTADO:" output.txt | head -n1 || true)
-          if [ -z "$line" ]; then
-            echo "Não foi possível localizar a linha de resultado."
-            exit 1
-          fi
-
+          [ -z "$line" ] && { echo "Não foi possível localizar a linha de resultado."; exit 1; }
           valor=$(echo "$line" | awk '{print $2}')
           moeda=$(echo "$line" | awk '{print $3}')
-
           {
             echo "resultado_pretty=$line"
             echo "valor_num=$valor"
@@ -83,7 +93,6 @@ jobs:
         run: |
           {
             echo "### Conversão de BRL"
-            echo ""
             echo "- **Entrada**: \`${{ inputs.valor_brl }} BRL\`"
             echo "- **Moeda destino**: \`${{ inputs.moeda_destino }}\`"
             echo "- **Resultado**: \`${{ steps.parse.outputs.resultado_pretty }}\`"
