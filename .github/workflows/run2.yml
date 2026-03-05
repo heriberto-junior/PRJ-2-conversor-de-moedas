@@ -1,0 +1,68 @@
+name: COBOL Run 2 (rápido, sem compilação)
+
+on:
+  workflow_dispatch:
+    inputs:
+      valor_brl:
+        description: "Valor em BRL (ex: 123.45 ou 123,45)"
+        required: true
+        type: string
+        default: '1.00'
+      moeda_destino:
+        description: "Converter para"
+        required: true
+        type: choice
+        options: [USD, EUR, JPY, GBP, AUD, CAD]
+
+permissions:
+  contents: read
+
+env:
+  COBOL_EXECUTABLE: coin
+  BUILD_WORKFLOW_FILE: build2.yml
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar GNU COBOL (para libraries)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcob4
+
+      - name: Baixar binário da última release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Buscar a release mais recente
+          RELEASE=$(gh release view --json tagName -q '.tagName' || echo "")
+          
+          if [ -z "$RELEASE" ]; then
+            echo "❌ Nenhuma release encontrada. Execute build2.yml primeiro e crie uma release."
+            exit 1
+          fi
+          
+          echo "📥 Baixando binário da release: $RELEASE"
+          
+          # Download do binário
+          gh release download "$RELEASE" -p "${{ env.COBOL_EXECUTABLE }}" -O "${{ env.COBOL_EXECUTABLE }}"
+          
+          chmod +x "${{ env.COBOL_EXECUTABLE }}"
+          echo "✓ Binário pronto para execução"
+
+      - name: Executar conversor de moedas
+        run: |
+          echo "═══════════════════════════════════════"
+          echo "  🔄 Conversor de Moedas COBOL"
+          echo "═══════════════════════════════════════"
+          echo ""
+          echo "💵 Valor: ${{ github.event.inputs.valor_brl }} BRL"
+          echo "🎯 Destino: ${{ github.event.inputs.moeda_destino }}"
+          echo ""
+          echo "───────────────────────────────────────"
+          ./${{ env.COBOL_EXECUTABLE }} "${{ github.event.inputs.valor_brl }}" "${{ github.event.inputs.moeda_destino }}"
+          echo "───────────────────────────────────────"
