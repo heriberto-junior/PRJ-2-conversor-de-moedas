@@ -25,7 +25,7 @@ on:
           - CAD
         
 env:
-  COBOL_PROGRAM: src/coin.cob
+  COBOL_PROGRAM: coin.cob
   COBOL_EXECUTABLE: coin
 
 jobs:
