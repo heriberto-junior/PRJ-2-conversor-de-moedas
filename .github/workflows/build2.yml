@@ -1,0 +1,59 @@
+name: COBOL Build (artifact) - Compilação
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+env:
+  COBOL_PROGRAM: coin.cob
+  COBOL_EXECUTABLE: coin
+  ARTIFACT_NAME: coin-bin
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Instalar GNU COBOL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnucobol
+          cobc --version
+
+      - name: Compilar programa COBOL (estático)
+        run: |
+          cobc -x -free -static -o "${{ env.COBOL_EXECUTABLE }}" "${{ env.COBOL_PROGRAM }}"
+          echo "✓ Compilação bem-sucedida"
+
+      - name: Publicar binário como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.COBOL_EXECUTABLE }}
+          if-no-files-found: error
+
+      - name: Criar Release com binário compilado
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ env.COBOL_EXECUTABLE }}
+          tag_name: latest
+          name: "COBOL Converter - Latest Build"
+          body: |
+            Binário compilado estaticamente - pronto para usar.
+            
+            **Build Info:**
+            - Compilador: GNU COBOL
+            - Data: ${{ github.event.head_commit.timestamp }}
+            - Commit: ${{ github.event.head_commit.message }}
+            
+            Use com: `./coin <valor_em_brl> <moeda_destino>`
+          overwrite: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
