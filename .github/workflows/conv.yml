@@ -1,0 +1,54 @@
+name: COBOL CI/CD Pipeline Conversor
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      valor_brl:
+        description: "Valor em BRL (ex: 123.45 ou 123,45)"
+        required: true
+        type: string
+        default: '1.00'
+      moeda_destino:
+        description: "Converter para"
+        required: true
+        type: choice
+        options:
+          - USD
+          - EUR
+          - JPY
+          - GBP
+          - AUD
+          - CAD
+        
+env:
+  COBOL_PROGRAM: src/coin.cob
+  COBOL_EXECUTABLE: coin
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+    
+    - name: Instalar GNU COBOL
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gnucobol
+        cobc --version
+    
+    - name: Compilar programa COBOL
+      run: |
+        cobc -x -free -o ${{ env.COBOL_EXECUTABLE }} ${{ env.COBOL_PROGRAM }}
+        echo "✓ Compilação bem-sucedida"
+    
+    - name: Executar conversão
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        echo "Executando com valores customizados"
+        ./${{ env.COBOL_EXECUTABLE }} ${{ github.event.inputs.valor_brl }} ${{ github.event.inputs.moeda_destino }}
