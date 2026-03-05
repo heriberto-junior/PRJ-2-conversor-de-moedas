@@ -1,0 +1,90 @@
+name: COBOL Run (rápido, sem compilação)
+
+on:
+  workflow_dispatch:
+    inputs:
+      valor_brl:
+        description: "Valor em BRL (ex: 123.45 ou 123,45)"
+        required: true
+        type: string
+        default: '1.00'
+      moeda_destino:
+        description: "Converter para"
+        required: true
+        type: choice
+        options:
+          - USD
+          - EUR
+          - JPY
+          - GBP
+          - AUD
+          - CAD
+
+env:
+  COBOL_EXECUTABLE: coin
+  ARTIFACT_NAME: coin-bin
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    outputs:
+      resultado_pretty: ${{ steps.parse.outputs.resultado_pretty }}
+      valor_num: ${{ steps.parse.outputs.valor_num }}
+      moeda_out: ${{ steps.parse.outputs.moeda_out }}
+
+    steps:
+      - name: Checkout do repositório (cotacao.txt vem daqui)
+        uses: actions/checkout@v4
+
+      - name: Baixar binário compilado
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+
+      - name: Garantir permissão de execução
+        run: chmod +x "${{ env.COBOL_EXECUTABLE }}"
+
+      - name: Executar conversão
+        id: run
+        env:
+          VALOR: ${{ inputs.valor_brl }}
+          MOEDA: ${{ inputs.moeda_destino }}
+        run: |
+          set -e
+          # Agora o executável lê o cotacao.txt que já está no repo
+          ./${{ env.COBOL_EXECUTABLE }} "$VALOR" "$MOEDA" | tee output.txt
+
+          if grep -q "^ERRO:" output.txt; then
+            echo "Falha de validação/conversão:"
+            cat output.txt
+            exit 1
+          fi
+
+      - name: Extrair resultado
+        id: parse
+        run: |
+          line=$(grep "^RESULTADO:" output.txt | head -n1 || true)
+          if [ -z "$line" ]; then
+            echo "Não foi possível localizar a linha de resultado."
+            exit 1
+          fi
+
+          valor=$(echo "$line" | awk '{print $2}')
+          moeda=$(echo "$line" | awk '{print $3}')
+
+          {
+            echo "resultado_pretty=$line"
+            echo "valor_num=$valor"
+            echo "moeda_out=$moeda"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publicar no resumo
+        run: |
+          {
+            echo "### Conversão de BRL"
+            echo ""
+            echo "- **Entrada**: \`${{ inputs.valor_brl }} BRL\`"
+            echo "- **Moeda destino**: \`${{ inputs.moeda_destino }}\`"
+            echo "- **Resultado**: \`${{ steps.parse.outputs.resultado_pretty }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
