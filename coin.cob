@@ -35,6 +35,9 @@
        01 WS-TEMP-FRAC       PIC 9(10).
        01 WS-TAXA            PIC 9(10)V9(10).
 
+       *> Campo editado para exibir o valor final sem zeros à esquerda
+       01 WS-VALOR-EDIT PIC ZZ9.999.
+      
        01 EOF-FLAG           PIC X VALUE "N".
        01 FOUND-FLAG         PIC X VALUE "N".
 
@@ -110,8 +113,14 @@
            *> ---------------------------------------------------
            *> Calcular conversão
            *> ---------------------------------------------------
-           COMPUTE WS-VALOR-NUM = WS-VALOR-NUM * WS-TAXA.
+           *> Calcular conversão
+           COMPUTE WS-VALOR-NUM ROUNDED = WS-VALOR-NUM * WS-TAXA.
 
-           DISPLAY "RESULTADO: " WS-VALOR-NUM.
+           *> Mover para o campo editado (aplica máscara ZZ9.999)
+           MOVE WS-VALOR-NUM TO WS-VALOR-EDIT.
+
+           *> Exibir no formato desejado
+           DISPLAY "Resultado: " WS-VALOR-EDIT " " WS-DESTINO.
 
            STOP RUN.
+
