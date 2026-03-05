@@ -26,9 +26,9 @@ jobs:
           sudo apt-get install -y gnucobol
           cobc --version
 
-      - name: Compilar programa COBOL
+      - name: Compilar programa COBOL (estático)
         run: |
-          cobc -x -free -o "${{ env.COBOL_EXECUTABLE }}" "${{ env.COBOL_PROGRAM }}"
+          cobc -x -free -static -o "${{ env.COBOL_EXECUTABLE }}" "${{ env.COBOL_PROGRAM }}"
           echo "✓ Compilação bem-sucedida"
 
       - name: Publicar binário como artifact
