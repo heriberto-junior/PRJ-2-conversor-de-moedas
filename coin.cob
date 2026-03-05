@@ -16,6 +16,10 @@ IDENTIFICATION DIVISION.
           05 FRAC-PARTE   PIC 9(5).
 
        WORKING-STORAGE SECTION.
+       01 WS-ARGUMENTO PIC X(100).
+       01 LEN1          PIC 9(3).
+       01 LEN2          PIC 9(3).
+      
        01 WS-ARG1         PIC X(30).
        01 WS-ARG2         PIC X(10).
 
@@ -35,8 +39,15 @@ IDENTIFICATION DIVISION.
        PROCEDURE DIVISION.
 
        MAIN-START.
-           ACCEPT WS-VALOR-TXT FROM ARGUMENT-VALUE.
-           ACCEPT WS-DESTINO   FROM ARGUMENT-VALUE.
+
+      *> Receber todos os argumentos da linha de comando
+           ACCEPT WS-ARGUMENTO FROM COMMAND-LINE.
+           
+      *> Analisar os argumentos recebidos e separa em 2 campos
+           UNSTRING WS-ARGUMENTO DELIMITED BY SPACE
+               INTO WS-VALOR-TXT COUNT IN LEN1
+                    WS-DESTINO COUNT IN LEN2
+           END-UNSTRING.
 
       *---------------------------------------------------------
       * VALIDAR INPUT – PERMITIR SOMENTE: 0–9 . ,
